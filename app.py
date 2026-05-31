@@ -1,12 +1,31 @@
 from flask import Flask, render_template, request, redirect, session, send_from_directory
 from werkzeug.utils import secure_filename
 from functools import wraps
+from markupsafe import escape
+from flask_talisman import Talisman
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 import os
 import sqlite3
 import bcrypt
 
 app = Flask(__name__)
+
+app.config['SECRET_KEY'] = 'your_secret_key'
+
+Talisman(app, content_security_policy=None)
 app.config["UPLOAD_FOLDER"] = "uploads"
+
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["200 per day", "50 per hour"]
+)
+
+@app.after_request
+def set_security_headers(response):
+    response.headers['Server'] = 'SecureServer'
+    return response
 
 
 def login_required(f):
@@ -90,6 +109,7 @@ def register():
     return render_template("register.html")
 
 @app.route("/login", methods=["GET","POST"])
+@limiter.limit("5 per minute")
 def login():
 
     if request.method == "POST":
@@ -235,4 +255,4 @@ def uploaded_file(filename):
     )
 
 
-app.run(debug=True)
+app.run(host="0.0.0.0", port=5000, debug=True)
